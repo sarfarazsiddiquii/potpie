@@ -7,6 +7,7 @@ from alembic.operations import ops
 
 from core.database import Base
 from users.model import User  # Import all your models
+from projects.model import Project
 
 from dotenv import load_dotenv
 
