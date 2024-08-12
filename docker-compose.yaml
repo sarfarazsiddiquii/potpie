@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: momentum
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    environment:
+      NEO4J_AUTH: neo4j/mysecretpassword
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    networks:
+      - app-network
+
+  redis:
+    image: redis:latest
+    container_name: redis_broker
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.25.7
+    container_name: weaviate
+    command: "--host 0.0.0.0 --port 8082 --scheme http"
+    ports:
+      - 8082:8082
+      - 50051:50051
+    restart: on-failure
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      ENABLE_MODULES: ""
+      CLUSTER_HOSTNAME: "node1"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
