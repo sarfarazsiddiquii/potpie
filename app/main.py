@@ -5,7 +5,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.database import Base, engine
+
+
 load_dotenv(override=True)
+
+# Initialize database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -19,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def check_and_set_env_vars():
     required_env_vars = [
         "OPENAI_API_KEY",
@@ -31,6 +38,7 @@ def check_and_set_env_vars():
 
     
 check_and_set_env_vars()
+
 
 @app.get("/health")
 def health_check():
