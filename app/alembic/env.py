@@ -5,9 +5,9 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from alembic.operations import ops
 
-from core.database import Base
-from users.model import User  # Import all your models
-from projects.model import Project
+from app.core.database import Base
+from app.modules.users.model import User  # Import all your models
+from app.modules.projects.model import Project
 
 from dotenv import load_dotenv
 

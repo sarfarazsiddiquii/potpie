@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import JSONB, BYTEA
 from sqlalchemy.orm import relationship
 from sqlalchemy.schema import ForeignKeyConstraint
 from sqlalchemy.sql import func
-from core.database import Base
+from app.core.database import Base
 
 class ProjectStatusEnum(str, Enum):
     CREATED = 'created'
