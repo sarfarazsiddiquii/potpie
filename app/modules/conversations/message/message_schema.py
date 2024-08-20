@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from .model import MessageType
+
+from app.modules.conversations.message.message_model import MessageType, MessageStatus
 
 class MessageRequest(BaseModel):
     content: str
@@ -14,6 +15,7 @@ class MessageResponse(BaseModel):
     type: MessageType
     reason: Optional[str] = None
     created_at: datetime
+    status : MessageStatus
 
     class Config:
         from_attributes = True
