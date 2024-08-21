@@ -2,7 +2,7 @@
 FROM python:3.10-slim
 
 # Install Git and PostgreSQL development libraries
-RUN apt-get update && apt-get install -y git procps libpq-dev
+RUN apt-get update && apt-get install -y git procps
 
 # Set the working directory in the container
 WORKDIR /app

@@ -4,7 +4,6 @@ sqlalchemy
 alembic
 gunicorn
 python-dotenv
-psycopg2
 psycopg2-binary
 openai
 duckduckgo-search
