@@ -1,8 +1,8 @@
 # Use an official Python runtime as a parent image
 FROM python:3.10-slim
 
-# Install Git
-RUN apt-get update && apt-get install -y git procps
+# Install Git and PostgreSQL development libraries
+RUN apt-get update && apt-get install -y git procps libpq-dev
 
 # Set the working directory in the container
 WORKDIR /app
