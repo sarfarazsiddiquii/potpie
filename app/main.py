@@ -1,6 +1,9 @@
 import os
 import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +15,13 @@ from app.modules.users.user_router import router as user_router
 
 from app.modules.utils.dummy_setup import DummyDataSetup
 
+from app.modules.utils.firebase_setup import FirebaseSetup
+from app.modules.parsing.graph_construction.parsing_router import router as parsing_router
+from app.modules.auth.auth_router import auth_router
+from app.modules.key_management.secret_manager import router as secret_manager_router
+
+from app.core.mongo_manager import MongoManager
+
 class MainApp:
     def __init__(self):
         load_dotenv(override=True)
@@ -19,8 +29,21 @@ class MainApp:
         self.setup_cors()
         self.initialize_database()
         self.check_and_set_env_vars()
-        self.setup_data()
+        if os.getenv("isDevelopmentMode") == "enabled":
+            self.setup_data()
+        else:
+            FirebaseSetup.firebase_init()
         self.include_routers()
+        self.verify_mongodb_connection()
+
+    def verify_mongodb_connection(self):
+        try:
+            mongo_manager = MongoManager.get_instance()
+            mongo_manager.verify_connection()
+            logging.info("MongoDB connection verified successfully")
+        except Exception as e:
+            logging.error(f"Failed to verify MongoDB connection: {str(e)}")
+            raise
 
     def setup_cors(self):
         origins = ["*"]
@@ -56,6 +79,9 @@ class MainApp:
     def include_routers(self):
         self.app.include_router(user_router, prefix="/api/v1", tags=["User"])
         self.app.include_router(conversations_router, prefix="/api/v1", tags=["Conversations"])
+        self.app.include_router(parsing_router,  prefix="/api/v1", tags=["Parsing"])
+        self.app.include_router(auth_router,  prefix="/api/v1", tags=["Auth"])
+        self.app.include_router(secret_manager_router,  prefix="/api/v1", tags=["Secret Manager"])
 
 
     def add_health_check(self):
@@ -67,7 +93,10 @@ class MainApp:
         self.add_health_check()
         return self.app
 
-
 # Create an instance of MainApp and run it
 main_app = MainApp()
 app = main_app.run()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    MongoManager.close_connection()

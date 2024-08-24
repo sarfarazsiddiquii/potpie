@@ -3,6 +3,7 @@ from app.core.database import SessionLocal
 from app.modules.projects.projects_model import Project
 from app.modules.users.user_model import User
 from sqlalchemy.sql import func
+import logging
 
 class DummyDataSetup:
     def __init__(self):
@@ -26,9 +27,9 @@ class DummyDataSetup:
                 )
                 self.db.add(user)
                 self.db.commit()
-                print(f"Created dummy user with uid: {user.uid}")
+                logging.info(f"Created dummy user with uid: {user.uid}")
             else:
-                print("Dummy user already exists")
+                logging.info("Dummy user already exists")
         finally:
             self.db.close()
 
@@ -38,13 +39,11 @@ class DummyDataSetup:
             dummy_user = self.db.query(User).filter_by(uid=os.getenv("defaultUsername")).first()
             if dummy_user:
                 # Check if the dummy project already exists
-                project_exists = self.db.query(Project).filter_by(directory="dummy_directory").first()
+                project_exists = self.db.query(Project).filter_by(repo_name="dummy_repo").first()
                 if not project_exists:
                     # Create a dummy project
                     dummy_project = Project(
-                        directory="dummy_directory",
-                        is_default=True,
-                        project_name="Dummy Project Created To Test AI Agent",
+                        id="dummy_project_id",
                         properties=b'{}',
                         repo_name="dummy_repo",
                         branch_name="main",
@@ -53,14 +52,14 @@ class DummyDataSetup:
                         commit_id="dummy_commit_id",
                         is_deleted=False,
                         updated_at=func.now(),
-                        status="created"
+                        status="ready"
                     )
                     self.db.add(dummy_project)
                     self.db.commit()
-                    print(f"Created dummy project with id: {dummy_project.id}")
+                    logging.info(f"Created dummy project with id: {dummy_project.id}")
                 else:
-                    print("Dummy project already exists")
+                    logging.info("Dummy project already exists")
             else:
-                print("Dummy user not found, cannot create dummy project")
+                logging.info("Dummy user not found, cannot create dummy project")
         finally:
             self.db.close()
