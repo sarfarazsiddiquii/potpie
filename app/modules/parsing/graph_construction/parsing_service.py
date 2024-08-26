@@ -10,8 +10,8 @@ from app.core.config import config_provider
 from app.modules.parsing.graph_construction.parsing_helper import (
     ParseHelper,
     ParsingFailedError,
-    RepoMap,
 )
+from app.modules.parsing.graph_construction.parsing_repomap import RepoMap
 from app.modules.projects.projects_schema import ProjectStatusEnum
 from app.modules.projects.projects_service import ProjectService
 
@@ -125,15 +125,28 @@ class CodeGraphService:
 
 
 class ParsingService:
-    async def analyze_directory(repo_dir, project_id, user_id, db):
-        repo_lang = ParseHelper(db).detect_repo_language(repo_dir)
+    # @celery_worker_instance.celery_instance.task(name='app.modules.parsing.graph_construction.parsing_service.analyze_directory')
+    @staticmethod
+    async def analyze_directory(extracted_dir: str, project_id: int, user_id: str, db):
+        logging.info(f"Analyzing directory: {extracted_dir}")
+
+        try:
+            await ParsingService._analyze_directory(
+                extracted_dir, project_id, user_id, db
+            )
+        finally:
+            db.close()
+
+    async def _analyze_directory(extracted_dir: str, project_id: int, user_id: str, db):
+        logging.info(f"_Analyzing directory: {extracted_dir}")
+        repo_lang = ParseHelper(db).detect_repo_language(extracted_dir)
 
         if repo_lang in ["python", "javascript", "typescript"]:
             graph_manager = Neo4jManager(project_id, user_id)
 
             try:
                 graph_constructor = GraphConstructor(graph_manager, user_id)
-                n, r = graph_constructor.build_graph(repo_dir)
+                n, r = graph_constructor.build_graph(extracted_dir)
                 graph_manager.save_graph(n, r)
                 await ProjectService(db).update_project_status(
                     project_id, ProjectStatusEnum.PARSED
@@ -141,7 +154,9 @@ class ParsingService:
             except Exception as e:
                 logging.error(e)
                 logging.error(traceback.format_exc())
-
+                await ProjectService(db).update_project_status(
+                    project_id, ProjectStatusEnum.ERROR
+                )
             finally:
                 graph_manager.close()
         elif repo_lang != "other":
@@ -153,11 +168,10 @@ class ParsingService:
                     neo4j_config["password"],
                 )
 
-                service.create_and_store_graph(repo_dir, project_id, user_id)
+                service.create_and_store_graph(extracted_dir, project_id, user_id)
                 await ProjectService(db).update_project_status(
                     project_id, ProjectStatusEnum.PARSED
                 )
-
             finally:
                 service.close()
         else:

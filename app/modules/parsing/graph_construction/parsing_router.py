@@ -1,27 +1,28 @@
+import logging
 import os
 import shutil
+import time
 import traceback
 from contextlib import contextmanager
-from typing import Any, Tuple
 
 from fastapi import Depends, HTTPException
-from git import Repo
-from github import Github
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.modules.auth.auth_service import AuthService
-from app.modules.github.github_service import GithubService
 from app.modules.parsing.graph_construction.parsing_helper import (
     ParseHelper,
     ParsingServiceError,
 )
 from app.modules.parsing.graph_construction.parsing_service import ParsingService
+from app.modules.parsing.knowledge_graph.code_inference_service import (
+    CodebaseInferenceService,
+)
 from app.modules.projects.projects_schema import ProjectStatusEnum
 from app.modules.projects.projects_service import ProjectService
 from app.modules.utils.APIRouter import APIRouter
 
-from .parsing_schema import ParsingRequest, RepoDetails
+from .parsing_schema import ParsingRequest
 
 router = APIRouter()
 
@@ -35,38 +36,6 @@ class ParsingAPI:
             yield
         finally:
             os.chdir(old_dir)
-
-    async def clone_or_copy_repository(
-        repo_details: RepoDetails, db: Session, user_id: str
-    ) -> Tuple[Any, str, Any]:
-        if repo_details.repo_path:
-            if not os.path.exists(repo_details.repo_path):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Local repository does not exist on given path",
-                )
-            repo = Repo(repo_details.repo_path)
-            owner = None
-            auth = None
-        else:
-            github_service = GithubService(db)
-            response, auth, owner = github_service.get_github_repo_details(
-                repo_details.repo_name
-            )
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=400, detail="Failed to get installation ID"
-                )
-            app_auth = auth.get_installation_auth(response.json()["id"])
-            github = Github(auth=app_auth)
-            try:
-                repo = github.get_repo(repo_details.repo_name)
-            except Exception:
-                raise HTTPException(
-                    status_code=400, detail="Repository not found on GitHub"
-                )
-
-        return repo, owner, auth
 
     @router.post("/parse")
     async def parse_directory(
@@ -88,7 +57,7 @@ class ParsingAPI:
         try:
             # Step 1: Validate input
             ParsingAPI.validate_input(repo_details, user_id)
-            repo, owner, auth = await ParsingAPI.clone_or_copy_repository(
+            repo, owner, auth = await parse_helper.clone_or_copy_repository(
                 repo_details, db, user_id
             )
 
@@ -96,11 +65,20 @@ class ParsingAPI:
                 repo, repo_details.branch_name, auth, repo, user_id, project_id
             )
 
+            start_time = time.time()
+            await CodebaseInferenceService(db).process_repository(
+                repo_details, user_id, project_id
+            )
+            end_time = time.time()
+            logging.info(
+                f"Duration for processing repository: {end_time - start_time:.2f} seconds"
+            )
             await ParsingService.analyze_directory(
                 extracted_dir, project_id, user_id, db
             )
             shutil.rmtree(extracted_dir, ignore_errors=True)
             message = "The project has been parsed successfully"
+
             await project_manager.update_project_status(
                 project_id, ProjectStatusEnum.READY
             )
@@ -130,7 +108,8 @@ class ParsingAPI:
             )
         finally:
             if extracted_dir:
-                shutil.rmtree(extracted_dir, ignore_errors=True)
+                # shutil.rmtree(extracted_dir, ignore_errors=True)
+                pass
 
     def validate_input(repo_details: ParsingRequest, user_id: str):
         if os.getenv("isDevelopmentMode") != "enabled" and repo_details.repo_path:
