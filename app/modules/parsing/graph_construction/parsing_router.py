@@ -46,14 +46,13 @@ class ParsingAPI:
         user_id = user["user_id"]
         project_manager = ProjectService(db)
         project_id = None
-        parse_helper = ParseHelper(db)
         project = await project_manager.get_project_from_db(
             repo_details.repo_name, user_id
         )
         extracted_dir = None
         if project:
             project_id = project.id
-
+        parse_helper = ParseHelper(db)
         try:
             # Step 1: Validate input
             ParsingAPI.validate_input(repo_details, user_id)
@@ -73,6 +72,7 @@ class ParsingAPI:
             logging.info(
                 f"Duration for processing repository: {end_time - start_time:.2f} seconds"
             )
+
             await ParsingService.analyze_directory(
                 extracted_dir, project_id, user_id, db
             )
@@ -108,8 +108,7 @@ class ParsingAPI:
             )
         finally:
             if extracted_dir:
-                # shutil.rmtree(extracted_dir, ignore_errors=True)
-                pass
+                shutil.rmtree(extracted_dir, ignore_errors=True)
 
     def validate_input(repo_details: ParsingRequest, user_id: str):
         if os.getenv("isDevelopmentMode") != "enabled" and repo_details.repo_path:
