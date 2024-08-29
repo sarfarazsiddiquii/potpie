@@ -29,6 +29,7 @@ class Conversation(Base):
         SQLAEnum(ConversationStatus), default=ConversationStatus.ACTIVE, nullable=False
     )
     project_ids = Column(ARRAY(String), nullable=False)
+    agent_ids = Column(ARRAY(String), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), default=func.now(), nullable=False)
     updated_at = Column(
         TIMESTAMP(timezone=True),
@@ -37,13 +38,8 @@ class Conversation(Base):
         nullable=False,
     )
 
+    # Relationships
+    user = relationship("User", back_populates="conversations")
     messages = relationship(
         "Message", back_populates="conversation", cascade="all, delete-orphan"
     )
-
-
-# Conversation relationships
-Conversation.user = relationship("User", back_populates="conversations")
-Conversation.messages = relationship(
-    "Message", back_populates="conversation", cascade="all, delete-orphan"
-)

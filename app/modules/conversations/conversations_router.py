@@ -28,8 +28,9 @@ class ConversationAPI:
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
-        return await controller.create_conversation(conversation)
+        return await controller.create_conversation(conversation, user_id)
 
     @staticmethod
     @router.get(
@@ -41,8 +42,9 @@ class ConversationAPI:
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
-        return await controller.get_conversation_info(conversation_id)
+        return await controller.get_conversation_info(conversation_id, user_id)
 
     @staticmethod
     @router.get(
@@ -56,23 +58,23 @@ class ConversationAPI:
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
-        return await controller.get_conversation_messages(conversation_id, start, limit)
+        return await controller.get_conversation_messages(
+            conversation_id, start, limit, user_id
+        )
 
     @staticmethod
     @router.post("/conversations/{conversation_id}/message/")
     async def post_message(
         conversation_id: str,
         message: MessageRequest,
-        user_id: str,
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
-
-        # Directly pass the async generator to StreamingResponse
         message_stream = controller.post_message(conversation_id, message, user_id)
-
         return StreamingResponse(message_stream, media_type="text/event-stream")
 
     @staticmethod
@@ -84,9 +86,10 @@ class ConversationAPI:
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
         return StreamingResponse(
-            controller.regenerate_last_message(conversation_id),
+            controller.regenerate_last_message(conversation_id, user_id),
             media_type="text/event-stream",
         )
 
@@ -97,8 +100,9 @@ class ConversationAPI:
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
-        return await controller.delete_conversation(conversation_id)
+        return await controller.delete_conversation(conversation_id, user_id)
 
     @staticmethod
     @router.post("/conversations/{conversation_id}/stop/", response_model=dict)
@@ -107,5 +111,6 @@ class ConversationAPI:
         db: Session = Depends(get_db),
         user=Depends(AuthService.check_auth),
     ):
+        user_id = user["user_id"]
         controller = ConversationController(db)
-        return await controller.stop_generation(conversation_id)
+        return await controller.stop_generation(conversation_id, user_id)
