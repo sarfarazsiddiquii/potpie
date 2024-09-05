@@ -1,12 +1,12 @@
 #!/bin/bash
 source .env
 
-docker-compose up -d
+docker compose up -d
 
 # Wait for postgres to be ready
 echo "Waiting for postgres to be ready..."
-until docker inspect -f {{.State.Health.Status}} postgres | grep -q "healthy"; do
-  sleep 5
+until docker exec potpie_postgres pg_isready -U postgres; do
+  sleep 2
 done
 
 # Run momentum application with migrations

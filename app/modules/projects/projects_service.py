@@ -1,16 +1,13 @@
 import logging
-import os
-import shutil
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import String, and_, cast
+from sqlalchemy import String, cast
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.modules.projects.projects_model import Project
 from app.modules.projects.projects_schema import ProjectStatusEnum
-from app.modules.utils.model_helper import ModelHelper
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +104,7 @@ class ProjectService:
         project = ProjectService.get_project_by_id(self.db, project_id)
         if project:
             return {
-                "project_name": project.project_name,
-                "directory": project.directory,
+                "project_name": project.repo_name,
                 "id": project.id,
                 "commit_id": project.commit_id,
                 "status": project.status,
@@ -150,139 +146,12 @@ class ProjectService:
         )
         if project:
             return {
-                "project_name": project.project_name,
-                "directory": project.directory,
                 "id": project.id,
                 "commit_id": project.commit_id,
                 "status": project.status,
             }
         else:
             return None
-
-    async def get_first_project_from_db_by_repo_name_branch_name(
-        self, repo_name, branch_name
-    ):
-        project = (
-            self.db.query(Project)
-            .filter(Project.repo_name == repo_name, Project.branch_name == branch_name)
-            .first()
-        )
-        if project:
-            return ModelHelper.model_to_dict(project)
-        else:
-            return None
-
-    async def get_first_user_id_from_project_repo_name(self, repo_name):
-        project = self.db.query(Project).filter(Project.repo_name == repo_name).first()
-        if project:
-            return project.user_id
-        else:
-            return None
-
-    async def get_parsed_project_branches(
-        self, repo_name: str = None, user_id: str = None, default: bool = None
-    ):
-        query = self.db.query(Project).filter(Project.user_id == user_id)
-        if default is not None:
-            query = query.filter(Project.is_default == default)
-        if repo_name is not None:
-            query = query.filter(Project.repo_name == repo_name)
-        projects = query.all()
-        return [
-            (p.id, p.branch_name, p.repo_name, p.updated_at, p.is_default, p.status)
-            for p in projects
-        ]
-
-    async def soft_delete_project(self, project_id: int, user_id: str):
-        try:
-            result = ProjectService.update_project(
-                self.db,
-                project_id,
-                is_deleted=True,
-                updated_at=datetime.utcnow(),
-                user_id=user_id,
-            )
-            if not result:
-                raise HTTPException(
-                    status_code=404,
-                    detail="No matching project found or project is already deleted.",
-                )
-            else:
-                is_local_repo = os.getenv(
-                    "isDevelopmentMode"
-                ) == "enabled" and user_id == os.getenv("defaultUsername")
-                if is_local_repo:
-                    project_path = self.get_project_repo_details_from_db(
-                        project_id, user_id
-                    )["directory"]
-                    if os.path.exists(project_path):
-                        shutil.rmtree(project_path)
-                        logging.info(f"Deleted local project folder: {project_path}")
-                    else:
-                        logging.warning(
-                            f"Local project folder not found: {project_path}"
-                        )
-
-                logging.info(f"Project {project_id} deleted successfully.")
-
-        except Exception as e:
-            self.db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"An error occurred while deleting the project: {str(e)}",
-            )
-
-    async def restore_project(self, project_id: int, user_id: str):
-        try:
-            result = ProjectService.update_project(
-                self.db, project_id, is_deleted=False, user_id=user_id
-            )
-            if result:
-                message = f"Project with ID {project_id} restored successfully."
-            else:
-                message = "Project not found or already restored."
-            logging.info(message)
-            return message
-        except Exception as e:
-            self.db.rollback()
-            logging.error(f"An error occurred: {e}")
-            return "Error occurred during restoration."
-
-    async def restore_all_project(self, repo_name: str, user_id: str):
-        try:
-            projects = ProjectService.get_projects_by_repo_name(
-                self.db, repo_name, user_id, is_deleted=True
-            )
-            for project in projects:
-                ProjectService.update_project(self.db, project.id, is_deleted=False)
-            if projects:
-                message = f"Projects with repo_name {repo_name} restored successfully."
-            else:
-                message = "Projects not found or already restored."
-            logging.info(message)
-            return message
-        except Exception as e:
-            self.db.rollback()
-            logging.error(f"An error occurred: {e}")
-            return "Error occurred during restoration."
-
-    async def delete_all_project_by_repo_name(self, repo_name: str, user_id: str):
-        try:
-            projects = ProjectService.get_projects_by_repo_name(
-                self.db, repo_name, user_id, is_deleted=False
-            )
-            for project in projects:
-                ProjectService.update_project(self.db, project.id, is_deleted=True)
-            if projects:
-                message = f"Projects with repo_name {repo_name} deleted successfully."
-            else:
-                message = "Projects not found or already deleted."
-            logging.info(message)
-            return message
-        except Exception as e:
-            self.db.rollback()
-            logging.error(f"An error occurred: {e}")
-            return "Error occurred during deletion."
 
     def get_project_by_id(db: Session, project_id: int):
         return db.query(Project).filter(Project.id == project_id).first()
@@ -322,27 +191,3 @@ class ProjectService:
             raise HTTPException(status_code=404, detail="Project not found.")
         self.db.delete(project)
         self.db.commit()
-
-    def get_projects_by_repo_name(
-        db: Session, repo_name: str, user_id: str, is_deleted: bool = False
-    ):
-        try:
-            projects = (
-                db.query(Project)
-                .filter(
-                    and_(
-                        Project.repo_name == repo_name,
-                        Project.user_id == user_id,
-                        Project.is_deleted == is_deleted,
-                    )
-                )
-                .all()
-            )
-
-            return projects
-        except Exception as e:
-            db.rollback()
-            # Log the error
-            logging.error(f"Error fetching projects: {str(e)}")
-            # You might want to raise a custom exception here instead of returning None
-            return None
