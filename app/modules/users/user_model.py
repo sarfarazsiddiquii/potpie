@@ -17,8 +17,8 @@ class User(Base):
     provider_info = Column(JSONB)
     provider_username = Column(String(255))
 
-
-# User relationships
-User.projects = relationship("Project", back_populates="user")
-User.conversations = relationship("Conversation", back_populates="user")
-User.created_prompts = relationship("Prompt", back_populates="creator")
+    # User relationships
+    projects = relationship("Project", back_populates="user")
+    conversations = relationship("Conversation", back_populates="user")
+    created_prompts = relationship("Prompt", back_populates="creator")
+    preferences = relationship("UserPreferences", back_populates="user", uselist=False)
