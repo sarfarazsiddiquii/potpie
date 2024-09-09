@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime, timezone
 from typing import AsyncGenerator, List
 
@@ -25,14 +24,9 @@ from app.modules.conversations.message.message_schema import (
     MessageResponse,
 )
 from app.modules.intelligence.agents.debugging_agent import DebuggingAgent
-from app.modules.intelligence.agents.intelligent_tool_using_orchestrator import (
-    IntelligentToolUsingOrchestrator,
-)
 from app.modules.intelligence.agents.qna_agent import QNAAgent
 from app.modules.intelligence.memory.chat_history_service import ChatHistoryService
-from app.modules.intelligence.tools.duckduckgo_search_tool import DuckDuckGoTool
-from app.modules.intelligence.tools.google_trends_tool import GoogleTrendsTool
-from app.modules.intelligence.tools.wikipedia_tool import WikipediaTool
+from app.modules.intelligence.provider.provider_service import ProviderService
 from app.modules.projects.projects_service import ProjectService
 
 logger = logging.getLogger(__name__)
@@ -56,59 +50,49 @@ class ConversationService:
         db: Session,
         project_service: ProjectService,
         history_manager: ChatHistoryService,
-        orchestrator: IntelligentToolUsingOrchestrator,
         debugging_agent: DebuggingAgent,
         codebase_qna_agent: QNAAgent,
+        provider_service: ProviderService,
+        user_id: str,
     ):
         self.db = db
+        self.user_id = user_id
         self.project_service = project_service
         self.history_manager = history_manager
+        self.provider_service = provider_service
         self.agents = {
-            "chat_llm_orchestrator": orchestrator,
             "debugging_agent": debugging_agent,
             "codebase_qna_agent": codebase_qna_agent,
         }
 
     @classmethod
-    def create(cls, db: Session):
+    def create(cls, db: Session, user_id: str):
+        user_id = user_id
         project_service = ProjectService(db)
         history_manager = ChatHistoryService(db)
-        openai_key = cls._get_openai_key()
-        orchestrator = cls._initialize_orchestrator(openai_key, db)
-        debugging_agent = cls._initialize_debugging_agent(openai_key, db)
-        qna_agent = cls._initialize_qna_agent(openai_key, db)
+        provider_service = ProviderService(db, user_id)
+        instance = cls(
+            db, project_service, history_manager, None, None, provider_service, user_id
+        )
+        debugging_agent = instance._initialize_debugging_agent(db)
+        qna_agent = instance._initialize_qna_agent(db)
         return cls(
             db,
             project_service,
             history_manager,
-            orchestrator,
             debugging_agent,
             qna_agent,
+            provider_service,
+            user_id,
         )
 
-    @staticmethod
-    def _initialize_debugging_agent(openai_key: str, db: Session) -> DebuggingAgent:
-        return DebuggingAgent(openai_key, db)
+    def _initialize_debugging_agent(self, db: Session) -> DebuggingAgent:
+        llm = self.provider_service.get_llm()
+        return DebuggingAgent(llm, db)
 
-    @staticmethod
-    def _initialize_qna_agent(openai_key: str, db: Session) -> QNAAgent:
-        return QNAAgent(openai_key, db)
-
-    @staticmethod
-    def _get_openai_key() -> str:
-        key = os.getenv("OPENAI_API_KEY")
-        if not key:
-            raise ConversationServiceError(
-                "The OpenAI API key is not set in the environment variable 'OPENAI_API_KEY'."
-            )
-        return key
-
-    @staticmethod
-    def _initialize_orchestrator(
-        openai_key: str, db: Session
-    ) -> IntelligentToolUsingOrchestrator:
-        tools = [GoogleTrendsTool(), WikipediaTool(), DuckDuckGoTool()]
-        return IntelligentToolUsingOrchestrator(openai_key, tools, db)
+    def _initialize_qna_agent(self, db: Session) -> QNAAgent:
+        llm = self.provider_service.get_llm()
+        return QNAAgent(llm, db)
 
     async def create_conversation(
         self, conversation: CreateConversationRequest, user_id: str
@@ -308,7 +292,6 @@ class ConversationService:
             raise ConversationNotFoundError(
                 f"Conversation with id {conversation_id} not found"
             )
-
         agent = self.agents.get(conversation.agent_ids[0])
         if not agent:
             raise ConversationServiceError(
