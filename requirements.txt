@@ -51,3 +51,5 @@ resend
 transformers
 torch
 sentence-transformers
+nltk
+langchain_anthropic
