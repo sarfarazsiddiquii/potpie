@@ -25,10 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 class QNAAgent:
-    def __init__(self, llm, db: Session):
+    def __init__(self, mini_llm, llm, db: Session):
+        self.mini_llm = mini_llm
         self.llm = llm
         self.history_manager = ChatHistoryService(db)
-        self.tools = CodeTools.get_tools()
+        self.tools = CodeTools.get_kg_tools()
         self.prompt_service = PromptService(db)
         self.chain = None
         self.db = db
@@ -122,7 +123,7 @@ class QNAAgent:
                     }
                 )
 
-            logger.debug(f"Full LLM response: {full_response}")
+            logger.info(f"Full LLM response: {full_response}")
 
             self.history_manager.flush_message_buffer(
                 conversation_id, MessageType.AI_GENERATED

@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from functools import lru_cache
 from typing import AsyncGenerator, Dict, List
 
@@ -29,11 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 class UnitTestAgent:
-    def __init__(self, llm, db: Session):
-        self.openai_key = os.getenv("OPENAI_API_KEY")
+    def __init__(self, mini_llm, llm, db: Session):
+        self.mini_llm = mini_llm
         self.llm = llm
         self.history_manager = ChatHistoryService(db)
-        self.tools = CodeTools.get_tools()
+        self.tools = CodeTools.get_kg_tools()
         self.prompt_service = PromptService(db)
         self.chain = None
         self.db = db

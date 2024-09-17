@@ -3,6 +3,7 @@ from typing import List
 
 from langchain_anthropic import ChatAnthropic
 from langchain_openai.chat_models import ChatOpenAI
+from portkey_ai import PORTKEY_GATEWAY_URL, createHeaders
 
 from app.modules.key_management.secret_manager import SecretManager
 from app.modules.users.user_preferences_model import UserPreferences
@@ -15,6 +16,7 @@ class ProviderService:
         self.db = db
         self.llm = None
         self.user_id = user_id
+        self.PORTKEY_API_KEY = os.environ.get("PORTKEY_API_KEY")
 
     @classmethod
     def create(cls, db, user_id: str):
@@ -45,7 +47,7 @@ class ProviderService:
 
         return {"message": f"AI provider set to {provider}"}
 
-    def get_llm(self):
+    def get_large_llm(self):
         # Get user preferences from the database
         user_pref = (
             self.db.query(UserPreferences)
@@ -73,11 +75,19 @@ class ProviderService:
                 else:
                     raise e  # Re-raise if it's a different error
 
+            portkey_headers = createHeaders(
+                api_key=self.PORTKEY_API_KEY,
+                provider="openai",
+                metadata={"_user": self.user_id, "environment": os.environ.get("ENV")},
+            )
+
             self.llm = ChatOpenAI(
                 model_name="gpt-4o",
                 api_key=openai_key,  # Use the key properly
-                temperature=0.7,
+                temperature=0.3,
                 model_kwargs={"stream": True},
+                base_url=PORTKEY_GATEWAY_URL,
+                default_headers=portkey_headers,
             )
 
         elif preferred_provider == "anthropic":
@@ -92,11 +102,18 @@ class ProviderService:
                     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
                 else:
                     raise e  # Re-raise if it's a different error
+            portkey_headers = createHeaders(
+                api_key=self.PORTKEY_API_KEY,
+                provider="anthropic",
+                metadata={"_user": self.user_id, "environment": os.environ.get("ENV")},
+            )
 
             self.llm = ChatAnthropic(
                 model="claude-3-5-sonnet-20240620",
-                temperature=0,
-                api_key=anthropic_key,  # Use the key properly
+                temperature=0.3,
+                api_key=anthropic_key,
+                base_url=PORTKEY_GATEWAY_URL,
+                default_headers=portkey_headers,
             )
 
         else:
@@ -104,8 +121,13 @@ class ProviderService:
 
         return self.llm
 
-    def get_mini_llm(self):
+    def get_small_llm(self):
         # Get user preferences from the database
+        if self.user_id == "dummy":
+            user_pref = UserPreferences(
+                user_id=self.user_id, preferences={"llm_provider": "openai"}
+            )
+
         user_pref = (
             self.db.query(UserPreferences)
             .filter(UserPreferences.user_id == self.user_id)
@@ -130,9 +152,18 @@ class ProviderService:
                     openai_key = os.getenv("OPENAI_API_KEY")
                 else:
                     raise e  # Re-raise if it's a different error
+            portkey_headers = createHeaders(
+                api_key=self.PORTKEY_API_KEY,
+                provider="openai",
+                metadata={"_user": self.user_id, "environment": os.environ.get("ENV")},
+            )
 
             self.llm = ChatOpenAI(
-                model_name="gpt-4o-mini", api_key=openai_key, temperature=0.7
+                model_name="gpt-4o-mini",
+                api_key=openai_key,
+                temperature=0.3,
+                base_url=PORTKEY_GATEWAY_URL,
+                default_headers=portkey_headers,
             )
 
         elif preferred_provider == "anthropic":
@@ -146,9 +177,18 @@ class ProviderService:
                     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
                 else:
                     raise e  # Re-raise if it's a different error
+            portkey_headers = createHeaders(
+                api_key=self.PORTKEY_API_KEY,
+                provider="anthropic",
+                metadata={"_user": self.user_id, "environment": os.environ.get("ENV")},
+            )
 
             self.llm = ChatAnthropic(
-                model="claude-3-haiku-20240307", temperature=0, api_key=anthropic_key
+                model="claude-3-haiku-20240307",
+                temperature=0.3,
+                api_key=anthropic_key,
+                base_url=PORTKEY_GATEWAY_URL,
+                default_headers=portkey_headers,
             )
 
         else:

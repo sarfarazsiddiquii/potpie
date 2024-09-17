@@ -119,10 +119,7 @@ class GetCodeFromNodeIdTool:
             docstring = node_data["docstring"]
 
         return {
-            "repo_name": project.repo_name,
-            "branch_name": project.branch_name,
             "node_id": node_id,
-            "file_path": file_path,
             "relative_file_path": relative_file_path,
             "start_line": start_line,
             "end_line": end_line,
@@ -151,7 +148,7 @@ class GetCodeFromNodeIdTool:
         return self.run_multiple(repo_id, node_ids)
 
 
-def get_tool(sql_db: Session) -> List[StructuredTool]:
+def get_code_tools(sql_db: Session) -> List[StructuredTool]:
     """
     Get StructuredTool objects for the GetCodeFromNodeIdTool.
     """

@@ -6,8 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid6 import uuid7
 
 from app.celery.tasks.parsing_tasks import process_parsing
-from app.core.config_provider import config_provider
-from app.modules.parsing.graph_construction.code_graph_service import CodeGraphService
 from app.modules.parsing.graph_construction.parsing_helper import ParseHelper
 from app.modules.parsing.graph_construction.parsing_schema import ParsingRequest
 from app.modules.parsing.graph_construction.parsing_validator import (
@@ -45,7 +43,11 @@ class ParsingController:
 
                 logger.info(f"Submitting parsing task for new project {new_project_id}")
                 process_parsing.delay(
-                    repo_details.model_dump(), user_id, user_email, new_project_id
+                    repo_details.model_dump(),
+                    user_id,
+                    user_email,
+                    new_project_id,
+                    False,
                 )
 
                 return response
@@ -57,26 +59,17 @@ class ParsingController:
             is_latest = await parse_helper.check_commit_status(project_id)
 
             if not is_latest or project_status != ProjectStatusEnum.READY.value:
-                neo4j_config = config_provider.get_neo4j_config()
-
-                try:
-                    code_graph_service = CodeGraphService(
-                        neo4j_config["uri"],
-                        neo4j_config["username"],
-                        neo4j_config["password"],
-                        db,
-                    )
-
-                    await code_graph_service.cleanup_graph(project_id)
-                except Exception as e:
-                    logger.error(f"Error in cleanup_graph: {e}")
-                    raise HTTPException(status_code=500, detail="Internal server error")
+                cleanup_graph = True
 
                 logger.info(
                     f"Submitting parsing task for existing project {project_id}"
                 )
                 process_parsing.delay(
-                    repo_details.model_dump(), user_id, user_email, project_id
+                    repo_details.model_dump(),
+                    user_id,
+                    user_email,
+                    project_id,
+                    cleanup_graph,
                 )
 
                 response["status"] = ProjectStatusEnum.SUBMITTED.value
