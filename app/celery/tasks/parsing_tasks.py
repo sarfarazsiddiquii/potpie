@@ -25,7 +25,7 @@ class BaseTask(Task):
 
 
 @celery_app.task(
-    bind=True, base=BaseTask, name="app.celery.tasks.parsing_tasks.process_parsing"
+    bind=True, base=BaseTask, name="app.celery.tasks.parsing_tasks.process_parsing", autoretry_for=(Exception,), retry_kwargs={'max_retries': 2, 'countdown': 30}
 )
 def process_parsing(
     self,
@@ -60,7 +60,7 @@ def process_parsing(
         logger.info(f"Parsing process completed for project {project_id}")
     except Exception as e:
         logger.error(f"Error during parsing for project {project_id}: {str(e)}")
-        raise self.retry(exc=e, countdown=60, max_retries=3)
+        raise  # Let the automatic retry handle it
 
 
 logger.info("Parsing tasks module loaded")
