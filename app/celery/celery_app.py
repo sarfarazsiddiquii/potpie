@@ -50,7 +50,6 @@ def configure_celery(queue_prefix: str):
             },
         },
         # Add these new configurations
-        task_acks_late=True,
         worker_prefetch_multiplier=1,
         task_reject_on_worker_lost=True,
         task_track_started=True,

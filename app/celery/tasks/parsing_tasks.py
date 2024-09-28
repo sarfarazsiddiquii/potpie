@@ -11,7 +11,6 @@ from app.modules.parsing.graph_construction.parsing_service import ParsingServic
 
 logger = logging.getLogger(__name__)
 
-
 class BaseTask(Task):
     _db = None
 
@@ -31,8 +30,6 @@ class BaseTask(Task):
     bind=True,
     base=BaseTask,
     name="app.celery.tasks.parsing_tasks.process_parsing",
-    autoretry_for=(Exception,),
-    retry_kwargs={"max_retries": 2, "countdown": 30},
 )
 def process_parsing(
     self,
