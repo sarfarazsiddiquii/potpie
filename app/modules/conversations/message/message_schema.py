@@ -16,6 +16,10 @@ class MessageRequest(BaseModel):
     node_ids: Optional[List[NodeContext]] = None
 
 
+class RegenerateRequest(BaseModel):
+    node_ids: Optional[List[NodeContext]] = None
+
+
 class MessageResponse(BaseModel):
     id: str
     conversation_id: str
