@@ -127,6 +127,14 @@ class ParsingService:
 
         if language in ["python", "javascript", "typescript"]:
             graph_manager = Neo4jManager(project_id, user_id)
+            graph_manager.create_entityId_index()
+            graph_manager.create_node_id_index()
+            graph_manager.create_function_name_index()
+            with graph_manager.driver.session() as session:
+                node_query = """
+                CREATE INDEX repo_id_node_id_NODE IF NOT EXISTS FOR (n:NODE) ON (n.repoId, n.node_id)
+                """
+                session.run(node_query)
 
             try:
                 graph_constructor = GraphConstructor(graph_manager, user_id)
@@ -137,10 +145,7 @@ class ParsingService:
                         logger.error(f"Project: {project_id} Failed to build graph")
                         raise ParsingFailedError(f"Project: {project_id} Failed to build graph")
                 graph_manager.create_nodes(n)
-                with graph_manager.driver.session() as session:
-                    session.write_transaction(
-                        graph_manager._create_edges_txn, r, 1000, entityId=user_id
-                    )
+                graph_manager.create_edges(r)
 
                 await self.project_service.update_project_status(
                     project_id, ProjectStatusEnum.PARSED
@@ -205,3 +210,4 @@ class ParsingService:
             raise ParsingFailedError(
                 "Repository doesn't consist of a language currently supported."
             )
+
