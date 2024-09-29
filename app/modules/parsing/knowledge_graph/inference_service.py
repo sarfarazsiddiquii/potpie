@@ -171,7 +171,7 @@ RETURN n.node_id AS input_node_id, collect(DISTINCT entryPoint.node_id) AS entry
             def replace_match(match):
                 node_id = match.group(1)
                 if node_id in node_dict:
-                    return node_dict[node_id]["text"].split('\n', 1)[-1]
+                    return '\n' + node_dict[node_id]["text"].split('\n', 1)[-1]
                 return match.group(0)
 
             previous_text = None
