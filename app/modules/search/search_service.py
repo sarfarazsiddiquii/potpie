@@ -119,3 +119,7 @@ class SearchService:
         delete_stmt = delete(SearchIndex).where(SearchIndex.project_id == project_id)
         self.db.execute(delete_stmt)
         self.db.commit()
+
+    async def bulk_create_search_indices(self, nodes: List[Dict]):
+        # Create index entries for all nodes in bulk
+        self.db.bulk_insert_mappings(SearchIndex, nodes)

@@ -155,7 +155,7 @@ RETURN n.node_id AS input_node_id, collect(DISTINCT entryPoint.node_id) AS entry
             }
 
     def batch_nodes(
-        self, nodes: List[Dict], max_tokens: int = 64000, model: str = "gpt-4"
+        self, nodes: List[Dict], max_tokens: int = 32000, model: str = "gpt-4"
     ) -> List[List[DocstringRequest]]:
         batches = []
         current_batch = []
@@ -360,13 +360,24 @@ RETURN n.node_id AS input_node_id, collect(DISTINCT entryPoint.node_id) AS entry
     async def generate_docstrings(self, repo_id: str) -> Dict[str, DocstringResponse]:
         nodes = self.fetch_graph(repo_id)
         logger.info(f"Creating search indices for project {repo_id} with nodes count {len(nodes)}")
-        for node in nodes:
-            if node.get("file_path") not in {None, ""} and node.get("name") not in {
-                None,
-                "",
-            }:
-                await self.search_service.create_search_index(repo_id, node)
-        logger.info(f"Project {repo_id}: Created search indices over {len(nodes)} nodes")
+        
+        # Prepare a list of nodes for bulk insert
+        nodes_to_index = [
+            {
+                "project_id": repo_id,
+                "node_id": node["node_id"],
+                "name": node.get("name", ""),
+                "file_path": node.get("file_path", ""),
+                "content": f"{node.get('name', '')} {node.get('file_path', '')}"
+            }
+            for node in nodes
+            if node.get("file_path") not in {None, ""} and node.get("name") not in {None, ""}
+        ]
+        
+        # Perform bulk insert
+        await self.search_service.bulk_create_search_indices(nodes_to_index)
+        
+        logger.info(f"Project {repo_id}: Created search indices over {len(nodes_to_index)} nodes")
 
         await self.search_service.commit_indices()
         entry_points = self.get_entry_points(repo_id)
