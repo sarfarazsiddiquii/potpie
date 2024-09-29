@@ -360,6 +360,7 @@ RETURN n.node_id AS input_node_id, collect(DISTINCT entryPoint.node_id) AS entry
 
     async def generate_docstrings(self, repo_id: str) -> Dict[str, DocstringResponse]:
         nodes = self.fetch_graph(repo_id)
+        logger.info(f"Creating search indices for project {repo_id} with nodes count {len(nodes)}")
         for node in nodes:
             if node.get("file_path") not in {None, ""} and node.get("name") not in {
                 None,
