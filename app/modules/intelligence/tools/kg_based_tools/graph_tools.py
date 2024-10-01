@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 from app.core.config_provider import ConfigProvider
 from app.core.database import get_db
 from app.modules.parsing.graph_construction.code_graph_service import CodeGraphService
+from app.modules.parsing.knowledge_graph.inference_schema import (
+    QueryResponse
+)
 from app.modules.parsing.knowledge_graph.inference_service import InferenceService
 
 
@@ -86,12 +89,22 @@ class CodeTools:
         db = next(get_db())
         inference_service = InferenceService(db, "dummy")
 
-        async def process_query(query_request: QueryRequest) -> Tuple[str, str]:
+        async def process_query(query_request: QueryRequest) -> List[QueryResponse]:
             # Call the query_vector_index method directly from InferenceService
             results = inference_service.query_vector_index(
                 query_request.project_id, query_request.query, query_request.node_ids
             )
-            return query_request.query, results
+            return [
+                QueryResponse(
+                    node_id=result.get("node_id"),
+                    docstring=result.get("docstring"),
+                    file_path=result.get("file_path"),
+                    start_line=result.get("start_line") or 0,
+                    end_line=result.get("end_line") or 0,
+                    similarity=result.get("similarity"),
+                )
+            for result in results
+        ]
 
         tasks = [process_query(query) for query in queries]
         results = await asyncio.gather(*tasks)
