@@ -19,6 +19,7 @@ from app.modules.conversations.message.message_schema import NodeContext
 from app.modules.intelligence.agents.agentic_tools.unit_test_agent import (
     kickoff_unit_test_crew,
 )
+from app.modules.intelligence.agents.agents_service import AgentsService
 from app.modules.intelligence.memory.chat_history_service import ChatHistoryService
 from app.modules.intelligence.prompts.classification_prompts import (
     AgentType,
@@ -31,7 +32,6 @@ from app.modules.intelligence.prompts.prompt_service import PromptService
 from app.modules.intelligence.tools.kg_based_tools.get_code_from_node_id_tool import (
     GetCodeFromNodeIdTool,
 )
-from app.modules.intelligence.tools.kg_based_tools.graph_tools import CodeTools
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +41,8 @@ class UnitTestAgent:
         self.mini_llm = mini_llm
         self.llm = llm
         self.history_manager = ChatHistoryService(db)
-        self.tools = CodeTools.get_kg_tools()
         self.prompt_service = PromptService(db)
+        self.agents_service = AgentsService(db)
         self.chain = None
         self.db = db
 
@@ -138,6 +138,7 @@ class UnitTestAgent:
                     node_ids,
                     self.db,
                     self.mini_llm,
+                    user_id,
                 )
 
                 if test_response.pydantic:
@@ -148,7 +149,9 @@ class UnitTestAgent:
                     response = test_response.raw
 
                 tool_results = [
-                    SystemMessage(content=f"Unit test agent result:\n {response}")
+                    SystemMessage(
+                        content=f"Unit testing agent response, this is not visible to user:\n {response}"
+                    )
                 ]
 
             inputs = {
@@ -158,7 +161,7 @@ class UnitTestAgent:
             }
 
             logger.debug(f"Inputs to LLM: {inputs}")
-
+            citations = self.agents_service.format_citations(citations)
             full_response = ""
             async for chunk in self.chain.astream(inputs):
                 content = chunk.content if hasattr(chunk, "content") else str(chunk)
