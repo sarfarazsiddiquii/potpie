@@ -1,14 +1,17 @@
 import os
-from typing import List
+from typing import Any, Dict, List
 
+import agentops
 from crewai import Agent, Crew, Process, Task
 from pydantic import BaseModel, Field
 
 from app.modules.conversations.message.message_schema import NodeContext
+from app.modules.github.github_service import GithubService
 from app.modules.intelligence.tools.kg_based_tools.ask_knowledge_graph_queries_tool import (
     get_ask_knowledge_graph_queries_tool,
 )
 from app.modules.intelligence.tools.kg_based_tools.get_code_from_multiple_node_ids_tool import (
+    GetCodeFromMultipleNodeIdsTool,
     get_code_from_multiple_node_ids_tool,
 )
 from app.modules.intelligence.tools.kg_based_tools.get_code_from_node_id_tool import (
@@ -36,7 +39,7 @@ class RAGResponse(BaseModel):
 
 
 class RAGAgent:
-    def __init__(self, sql_db, llm, user_id):
+    def __init__(self, sql_db, llm, mini_llm, user_id):
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.max_iter = os.getenv("MAX_ITER", 5)
         self.sql_db = sql_db
@@ -52,6 +55,7 @@ class RAGAgent:
             sql_db, user_id
         )
         self.llm = llm
+        self.mini_llm = mini_llm
         self.user_id = user_id
 
     async def create_agents(self):
@@ -92,6 +96,8 @@ class RAGAgent:
         project_id: str,
         chat_history: List,
         node_ids: List[NodeContext],
+        file_structure: str,
+        code_results: List[Dict[str, Any]],
         query_agent,
     ):
         if not node_ids:
@@ -99,84 +105,82 @@ class RAGAgent:
 
         combined_task = Task(
             description=f"""
-            You must adhere to the specified {self.max_iter} iterations to optimize performance and reduce latency.
+            Adhere to {self.max_iter} iterations max. Analyze input:
+            - Chat History: {chat_history}
+            - Query: {query}
+            - Project ID: {project_id}
+            - User Node IDs: {[node.model_dump() for node in node_ids]}
+            - File Structure: {file_structure}
+            - Code Results for user node ids: {code_results}
 
-            ## Input Details:
-            - **Chat History:** {chat_history}
-            - **Input Query:** {query}
-            - **Project ID:** {project_id}
-            - **User Provided Node IDs:** {[node.model_dump() for node in node_ids]}
+            1. Analyze project structure:
+               - Identify key directories, files, and modules
+               - Guide search strategy and provide context
+               - Locate files relevant to query
+               - Use relevant file names with "Get Code and docstring From Probable Node Name" tool
 
-            ## Step 1: Initial Context Retrieval
-            - If user provided node IDs are present:
-            1. FIRST Use the "Get Code and docstring From Node ID" tool for each provided node ID.
-            2. Analyze the retrieved docstrings and code.
-            3. Determine if this information is sufficient to answer the input query.
+            2. Initial context retrieval:
+               - Analyze provided Code Results for user node ids
+               - If code results are not relevant move to next step`
 
-            ## Step 2: Knowledge Graph Query (if needed)
-            If the information from Step 1 is insufficient or if no node IDs were provided:
-            1. Transform the original query for the knowledge graph tool:
-            - Identify key concepts, code elements, and implied relationships.
-            - Consider the context from chat history.
-            - Determine the intent and key technical terms.
-            - Transform into keyword phrases that might match docstrings:
-                * Use concise, functionality-based phrases (e.g., "create document MongoDB collection").
-                * Focus on verb-based keywords (e.g., "create", "define", "calculate").
-                * Include docstring-related keywords like "parameters", "returns", "raises" when relevant.
-                * Preserve key technical terms from the original query.
-                * Generate multiple keyword variations to increase matching chances.
-                * Be specific in keywords to improve match accuracy.
-                * Ensure the query includes relevant details and follows a similar structure to enhance similarity search results.
-            2. Execute the transformed query using the knowledge graph tool.
-            3. Analyze the returned response and determine if the returned nodes are sufficient to answer the input query accurately.
+            3. Knowledge graph query (if needed):
+               - Transform query for knowledge graph tool
+               - Execute query and analyze results
 
-            ## Step 3: Additional Context Retrieval (if needed)
-            If the knowledge graph results are insufficient:
-            1. Use the "Node by Tags" tool to retrieve additional relevant nodes.
-            2. Extract probable node names (file, function names) from the input query or results.
-            3. Use the "Get Code and docstring From Probable Node Name" tool for these extracted names.
+            4. Additional context retrieval (if needed):
+               - Extract probable node names
+               - Use "Get Code and docstring From Probable Node Name" tool
 
-            ## Step 4: Result Analysis and Enrichment
-            - Evaluate the relevance of each result to the input query.
-            - Identify potential gaps or redundancies in the information.
-            - Develop a scoring mechanism considering:
-            * Relevance to query
-            * Code complexity
-            * Hierarchical importance in the codebase
-            * Frequency of references
-            - For highly-ranked results, determine additional valuable context.
-            - Retrieve code only if the docstring is insufficient to answer the input query.
-            - Ensure retrieved code is complete and self-contained.
+            5. Use "Get Nodes from Tags" tool as last resort only if absolutely necessary
 
-            ## Step 5: Response Composition
-            - Organize the re-ranked and enriched results logically.
-            - Include relevant citations and references to ensure traceability.
-            - Provide a comprehensive and focused response that answers the user's query and offers a deeper understanding of the relevant code and its context within the project.
-            - Maintain a balance between breadth and depth of information.
+            6. Analyze and enrich results:
+               - Evaluate relevance, identify gaps
+               - Develop scoring mechanism
+               - Retrieve code only if docstring insufficient
 
-            ## Step 6: Final Review
-            - Review the compiled results for overall coherence and relevance.
-            - Identify any remaining gaps or potential improvements for future queries.
+            7. Compose response:
+               - Organize results logically
+               - Include citations and references
+               - Provide comprehensive, focused answer
 
-            ## Objective:
-            Provide a comprehensive and focused response that not only answers the user's query but also offers a deeper understanding of the relevant code and its context within the project. Maintain a balance between breadth and depth of information retrieval.
-            Include the file paths of relevant nodes as citations in the response.
+            8. Final review:
+               - Check coherence and relevance
+               - Identify areas for improvement
+               - Format the file paths as follows (only include relevant project details from file path):
+                 path: potpie/projects/username-reponame-branchname-userid/gymhero/models/training_plan.py
+                 output: gymhero/models/training_plan.py
 
-            ## Note:
-            - If a stacktrace or mention of a file/function is present in the original query, use the "Get Code and docstring From Probable Node Name" tool with the probable node names extracted from the stacktrace or mention for additional context before proceeding with other steps.
-            - Always use available tools as directed in the original instructions.
-            - If insufficient information is found at any stage, proceed to the next step in the algorithm.
+            Objective: Provide a comprehensive response with deep context and relevant file paths as citations.
+
+            Note:
+            - Prioritize "Get Code and docstring From Probable Node Name" tool for stacktraces or specific file/function mentions
+            - Use available tools as directed
+            - Proceed to next step if insufficient information found
             """,
             expected_output=(
-                "Curated set of responses  that provide deep context to the user's query along with relevant file paths as citations."
-                "Ensure that your output ALWAYS follows the structure outlined in the following Pydantic model:\n"
-                f"{RAGResponse.model_json_schema()}"
+                "Curated set of responses that provide deep context to the user's query along with relevant file paths as citations."
             ),
             agent=query_agent,
-            output_pydantic=RAGResponse,
         )
 
-        return combined_task
+        respond_task = Task(
+            description="""You are an AI assistant with deep knowledge of the entire codebase. Act as a seasoned software architect to provide accurate, context-aware answers about code structure, functionality, and best practices. Ground responses in provided code context and tool results. Use markdown for code snippets. Be concise and avoid repetition. If unsure, state it clearly. For debugging, unit testing, or unrelated code explanations, suggest specialized agents.
+
+Analyze the input and tailor your response based on question type:
+- New questions: Provide comprehensive answers
+- Follow-ups: Build on previous explanations
+- Clarifications: Offer clear, concise explanations
+- Comments/feedback: Incorporate into your understanding
+
+Ground explanations in code context and tool results. Indicate when more information is needed. Use specific code references. Suggest best practices if applicable. Adapt to user's expertise level. Maintain a conversational tone and context from previous exchanges. Ask clarifying questions if needed. Offer follow-up suggestions to guide the conversation.
+
+Provide a comprehensive response with deep context, relevant file paths as citations, and include code snippets and docstrings where appropriate.Format it in markdown format.""",
+            expected_output="""Markdown formatted chat response to user's query""",
+            agent=query_agent,
+            context=[combined_task],
+            llm=self.mini_llm,
+        )
+        return combined_task, respond_task
 
     async def run(
         self,
@@ -184,23 +188,38 @@ class RAGAgent:
         project_id: str,
         chat_history: List,
         node_ids: List[NodeContext],
+        file_structure: str,
     ) -> str:
         os.environ["OPENAI_API_KEY"] = self.openai_api_key
 
+        agentops.init(
+            os.getenv("AGENTOPS_API_KEY"), default_tags=["openai-gpt-notebook"]
+        )
+        code_results = []
+        if len(node_ids) > 0:
+            code_results = await GetCodeFromMultipleNodeIdsTool(
+                self.sql_db, self.user_id
+            ).run_multiple(project_id, [node.node_id for node in node_ids])
         query_agent = await self.create_agents()
-        query_task = await self.create_tasks(
-            query, project_id, chat_history, node_ids, query_agent
+        query_task, respond_task = await self.create_tasks(
+            query,
+            project_id,
+            chat_history,
+            node_ids,
+            file_structure,
+            code_results,
+            query_agent,
         )
 
         crew = Crew(
             agents=[query_agent],
-            tasks=[query_task],
+            tasks=[query_task, respond_task],
             process=Process.sequential,
-            verbose=True,
-            inputs={"user_id": self.user_id},
+            verbose=False,
         )
 
         result = await crew.kickoff_async()
+        agentops.end_session("Success")
         return result
 
 
@@ -211,8 +230,12 @@ async def kickoff_rag_crew(
     node_ids: List[NodeContext],
     sql_db,
     llm,
+    mini_llm,
     user_id: str,
 ) -> str:
-    rag_agent = RAGAgent(sql_db, llm, user_id)
-    result = await rag_agent.run(query, project_id, chat_history, node_ids)
+    rag_agent = RAGAgent(sql_db, llm, mini_llm, user_id)
+    file_structure = GithubService(sql_db).get_project_structure(project_id)
+    result = await rag_agent.run(
+        query, project_id, chat_history, node_ids, file_structure
+    )
     return result
