@@ -119,7 +119,6 @@ class DebuggingAgent:
                     ],
                     node_ids,
                     self.db,
-                    self.llm,
                     self.mini_llm,
                     user_id,
                 )
