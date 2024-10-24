@@ -69,5 +69,4 @@ class ConfigProvider:
         return redis_url
 
 
-
 config_provider = ConfigProvider()

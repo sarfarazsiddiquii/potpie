@@ -164,7 +164,7 @@ class DebugAgent:
             - Clarifications: Offer clear, concise explanations
             - Comments/feedback: Incorporate into your understanding
 
-            Indicate when more information is needed. Use specific code references. Adapt to user's expertise level. Maintain a conversational tone and context from previous exchanges. 
+            Indicate when more information is needed. Use specific code references. Adapt to user's expertise level. Maintain a conversational tone and context from previous exchanges.
             Ask clarifying questions if needed. Offer follow-up suggestions to guide the conversation.
 
             Provide a comprehensive response with deep context, relevant file paths, include relevant code snippets wherever possible. Format it in markdown format.
@@ -176,7 +176,6 @@ class DebugAgent:
         )
 
         return combined_task
-
 
     async def run(
         self,

@@ -271,9 +271,7 @@ class GithubService:
             default_branch = repo.default_branch
             branches = repo.get_branches()
             branch_list = [
-                branch.name
-                for branch in branches
-                if branch.name != default_branch
+                branch.name for branch in branches if branch.name != default_branch
             ]
             return {"branches": [default_branch] + branch_list}
         except HTTPException as he:
