@@ -7,11 +7,14 @@ from app.modules.conversations.conversation.conversation_schema import (
     ConversationInfoResponse,
     CreateConversationRequest,
     CreateConversationResponse,
+    ConversationAccessType
 )
 from app.modules.conversations.conversation.conversation_service import (
     ConversationNotFoundError,
     ConversationService,
     ConversationServiceError,
+    AccessTypeNotFoundError,
+    AccessTypeReadError,
 )
 from app.modules.conversations.message.message_model import MessageType
 from app.modules.conversations.message.message_schema import (
@@ -22,8 +25,9 @@ from app.modules.conversations.message.message_schema import (
 
 
 class ConversationController:
-    def __init__(self, db: Session, user_id: str):
-        self.service = ConversationService.create(db, user_id)
+    def __init__(self, db: Session, user_id: str, user_email: str):
+        self.user_email = user_email
+        self.service = ConversationService.create(db, user_id, user_email)
         self.user_id = user_id
 
     async def create_conversation(
@@ -44,6 +48,8 @@ class ConversationController:
             return await self.service.delete_conversation(conversation_id, self.user_id)
         except ConversationNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except AccessTypeReadError as e:
+            raise HTTPException(status_code=401, detail=str(e))
         except ConversationServiceError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -56,6 +62,8 @@ class ConversationController:
             )
         except ConversationNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except AccessTypeNotFoundError as e:
+            raise HTTPException(status_code=401, detail=str(e))
         except ConversationServiceError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -68,6 +76,8 @@ class ConversationController:
             )
         except ConversationNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except AccessTypeNotFoundError as e:
+            raise HTTPException(status_code=401, detail=str(e))
         except ConversationServiceError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -81,6 +91,8 @@ class ConversationController:
                 yield chunk
         except ConversationNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except AccessTypeReadError as e:
+            raise HTTPException(status_code=403, detail=str(e))
         except ConversationServiceError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -94,6 +106,8 @@ class ConversationController:
                 yield chunk
         except ConversationNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except AccessTypeReadError as e:
+            raise HTTPException(status_code=403, detail=str(e))
         except ConversationServiceError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -112,5 +126,7 @@ class ConversationController:
             )
         except ConversationNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except AccessTypeReadError as e:
+            raise HTTPException(status_code=403, detail=str(e))
         except ConversationServiceError as e:
             raise HTTPException(status_code=500, detail=str(e))

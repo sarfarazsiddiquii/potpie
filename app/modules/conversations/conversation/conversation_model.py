@@ -10,6 +10,7 @@ from app.core.base_model import Base
 from app.modules.conversations.message.message_model import Message  # noqa
 
 
+
 class ConversationStatus(enum.Enum):
     ACTIVE = "active"
     ARCHIVED = "archived"
@@ -39,7 +40,7 @@ class Conversation(Base):
         onupdate=func.now(),
         nullable=False,
     )
-
+    shared_with_emails = Column(ARRAY(String), nullable=True)
     # Relationships
     user = relationship("User", back_populates="conversations")
     messages = relationship(

@@ -17,6 +17,8 @@ from .conversation.conversation_schema import (
     RenameConversationRequest,
 )
 from .message.message_schema import MessageRequest, MessageResponse, RegenerateRequest
+from app.modules.conversations.access.access_service import ShareChatService, ShareChatServiceError
+from app.modules.conversations.access.access_schema import ShareChatRequest, ShareChatResponse, SharedChatResponse
 
 router = APIRouter()
 
@@ -30,7 +32,8 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return await controller.create_conversation(conversation)
 
     @staticmethod
@@ -44,7 +47,8 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return await controller.get_conversation_info(conversation_id)
 
     @staticmethod
@@ -60,7 +64,8 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return await controller.get_conversation_messages(conversation_id, start, limit)
 
     @staticmethod
@@ -81,7 +86,8 @@ class ConversationAPI:
             )
 
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         message_stream = controller.post_message(conversation_id, message)
         return StreamingResponse(message_stream, media_type="text/event-stream")
 
@@ -96,7 +102,8 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return StreamingResponse(
             controller.regenerate_last_message(conversation_id, request.node_ids),
             media_type="text/event-stream",
@@ -110,7 +117,8 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return await controller.delete_conversation(conversation_id)
 
     @staticmethod
@@ -121,7 +129,8 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return await controller.stop_generation(conversation_id)
 
     @staticmethod
@@ -133,5 +142,22 @@ class ConversationAPI:
         user=Depends(AuthService.check_auth),
     ):
         user_id = user["user_id"]
-        controller = ConversationController(db, user_id)
+        user_email = user["email"]
+        controller = ConversationController(db, user_id, user_email)
         return await controller.rename_conversation(conversation_id, request.title)
+
+@router.post("/conversations/share", response_model=ShareChatResponse, status_code=201)
+async def share_chat(
+    request: ShareChatRequest,
+    db: Session = Depends(get_db),
+):
+    service = ShareChatService(db)
+    try:
+        shared_conversation = await service.share_chat(request.conversation_id, request.recipientEmails)
+        return ShareChatResponse(
+            message="Chat shared successfully!",
+            sharedID=shared_conversation
+        )
+    except ShareChatServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
