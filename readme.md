@@ -48,7 +48,7 @@ These tools are the foundation for the custom agents you create, allowing them t
 ---
 ## The Power of Custom Agents [Coming Soon]
 
-Potpie doesn’t stop at pre-built agents. With **Custom Agents**, developers can design personalized tools that handle repeatable tasks with precision. Whether it's generating boilerpldsfaate code, identifying security vulnerabilities, or suggesting optimizations, Potpie’s custom agents are flexible and built to adapt to your unique project requirements.
+Potpie doesn’t stop at pre-built agents. With **Custom Agents**, developers can design personalized tools that handle repeatable tasks with precision. Whether it's generating boilerplate code, identifying security vulnerabilities, or suggesting optimizations, Potpie’s custom agents are flexible and built to adapt to your unique project requirements.
  
 ### Custom Agents for Advanced Workflows
 
