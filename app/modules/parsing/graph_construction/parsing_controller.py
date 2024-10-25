@@ -34,7 +34,6 @@ class ParsingController:
 
         demo_repos = [
             "Portkey-AI/gateway",
-            "langchain-ai/langchain",
             "crewAIInc/crewAI",
             "mem0ai/mem0",
         ]
