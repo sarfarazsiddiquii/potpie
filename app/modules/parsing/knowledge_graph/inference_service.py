@@ -76,7 +76,7 @@ class InferenceService:
         except KeyError:
             logger.warning("Warning: model not found. Using cl100k_base encoding.")
             encoding = tiktoken.get_encoding("cl100k_base")
-        return len(encoding.encode(string))
+        return len(encoding.encode(string, disallowed_special=set()))
 
     def fetch_graph(self, repo_id: str) -> List[Dict]:
         batch_size = 100  # Define the batch size
