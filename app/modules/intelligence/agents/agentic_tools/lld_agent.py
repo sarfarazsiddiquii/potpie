@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 from app.modules.intelligence.tools.code_query_tools.get_code_file_structure import (
     get_code_file_structure_tool,
 )
+from app.modules.intelligence.tools.code_query_tools.get_node_neighbours_from_node_id_tool import (
+    get_node_neighbours_from_node_id_tool,
+)
 from app.modules.intelligence.tools.kg_based_tools.ask_knowledge_graph_queries_tool import (
     get_ask_knowledge_graph_queries_tool,
 )
@@ -64,6 +67,9 @@ class LowLevelDesignAgent:
             sql_db, user_id
         )
         self.get_code_file_structure = get_code_file_structure_tool(sql_db)
+        self.get_node_neighbours_from_node_id = get_node_neighbours_from_node_id_tool(
+            sql_db
+        )
 
     async def create_agents(self):
         codebase_analyst = Agent(
@@ -96,6 +102,7 @@ class LowLevelDesignAgent:
                 self.get_code_from_node_id,
                 self.get_code_from_probable_node_name,
                 self.get_code_file_structure,
+                self.get_node_neighbours_from_node_id,
             ],
             allow_delegation=True,
             verbose=True,
