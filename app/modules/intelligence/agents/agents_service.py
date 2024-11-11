@@ -71,7 +71,7 @@ class AgentsService:
         custom_agents = []
         skip = 0
         limit = 10
-        hmac_signature = AuthService.generate_hmac_signature(f"user_id={user_id}")
+        hmac_signature = AuthService.generate_hmac_signature(user_id)
         headers = {"X-HMAC-Signature": hmac_signature}
 
         async with aiohttp.ClientSession(headers=headers) as session:

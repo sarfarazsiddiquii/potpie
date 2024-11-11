@@ -44,7 +44,7 @@ class CustomAgent:
         """Fetch system prompt from POTPIE_PLUS_BASE_URL with HMAC authentication"""
         try:
             user_id = self.user_id
-            hmac_signature = AuthService.generate_hmac_signature(f"user_id={user_id}")
+            hmac_signature = AuthService.generate_hmac_signature(user_id)
             headers = {"X-HMAC-Signature": hmac_signature}
 
             url = f"{self.base_url}/custom-agents/agents/{self.agent_id}?user_id={user_id}"
