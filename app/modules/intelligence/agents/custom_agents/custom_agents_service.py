@@ -36,8 +36,8 @@ class CustomAgentsService:
         if node_ids:
             payload["node_ids"] = [node.dict() for node in node_ids]
 
-        # Set a reasonable timeout of 10 minutes to avoid indefinite waits
-        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=600.0)) as client:
+        # 1200 seconds = 20 minutes timeout for the entire request
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=1200.0)) as client:
             try:
                 response = await client.post(run_url, json=payload)
                 response.raise_for_status()
