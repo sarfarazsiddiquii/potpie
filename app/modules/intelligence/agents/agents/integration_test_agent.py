@@ -146,6 +146,7 @@ class IntegrationTestAgent:
                 self.get_code_from_probable_node_name,
                 self.get_code_from_multiple_node_ids,
             ],
+            async_execution=True,
         )
 
         return integration_test_task
@@ -181,7 +182,7 @@ class IntegrationTestAgent:
         return result
 
 
-async def kickoff_integration_test_crew(
+async def kickoff_integration_test_agent(
     query: str,
     project_id: str,
     node_ids: List[NodeContext],
@@ -192,7 +193,9 @@ async def kickoff_integration_test_crew(
 ) -> Dict[str, str]:
     if not node_ids:
         raise HTTPException(status_code=400, detail="No node IDs provided")
-    graph = GetCodeGraphFromNodeIdTool(sql_db).run(project_id, node_ids[0].node_id)
+    graph = GetCodeGraphFromNodeIdTool(sql_db, user_id).run(
+        project_id, node_ids[0].node_id
+    )
 
     def extract_node_ids(node):
         node_ids = []
